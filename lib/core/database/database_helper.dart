@@ -31,7 +31,6 @@ class DatabaseHelper {
 
   static Future<void> insertProduct(Product product) async {
     final prefs = await _prefs;
-    final products = await getProducts();
     final all = await _getAllProducts();
     all.add(product);
     await prefs.setString(_productsKey, jsonEncode(all.map((e) => e.toMap()).toList()));
