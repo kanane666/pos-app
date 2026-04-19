@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/models/sale.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/models/debt.dart';
+import '../../../core/models/client.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -158,6 +160,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 16),
+
+                  // Bouton dettes
+                  _DebtsSummaryButton(totalDebt: _totalDebt),
+
                   const SizedBox(height: 24),
 
                   // Répartition paiements
@@ -511,6 +518,232 @@ class _SaleCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+class _DebtsSummaryButton extends StatelessWidget {
+  final double totalDebt;
+  const _DebtsSummaryButton({required this.totalDebt});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _showAllDebts(context),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: totalDebt > 0
+              ? AppTheme.warning.withOpacity(0.08)
+              : AppTheme.secondary.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: totalDebt > 0
+                ? AppTheme.warning.withOpacity(0.4)
+                : AppTheme.secondary.withOpacity(0.3),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              totalDebt > 0
+                  ? Icons.warning_amber_outlined
+                  : Icons.check_circle_outline,
+              color:
+                  totalDebt > 0 ? AppTheme.warning : AppTheme.secondary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Gestion des dettes',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    totalDebt > 0
+                        ? '${totalDebt.toStringAsFixed(0)} F non encaissé aujourd\'hui'
+                        : 'Tout est encaissé',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: totalDebt > 0
+                          ? AppTheme.warning
+                          : AppTheme.secondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 14,
+              color: totalDebt > 0
+                  ? AppTheme.warning
+                  : AppTheme.secondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAllDebts(BuildContext context) async {
+    final debts = await DatabaseHelper.getDebts();
+    if (!context.mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.95,
+        minChildSize: 0.4,
+        expand: false,
+        builder: (_, controller) => Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppTheme.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Toutes les dettes',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.warning.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${debts.fold(0.0, (s, d) => s + d.remainingAmount).toStringAsFixed(0)} F',
+                      style: const TextStyle(
+                        color: AppTheme.warning,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: debts.isEmpty
+                  ? const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.check_circle_outline,
+                              size: 48, color: AppTheme.secondary),
+                          SizedBox(height: 8),
+                          Text('Aucune dette en cours',
+                              style: TextStyle(
+                                  color: AppTheme.secondary)),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      controller: controller,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: debts.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: 10),
+                      itemBuilder: (_, i) {
+                        final debt = debts[i];
+                        return Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppTheme.cardBg,
+                            borderRadius: BorderRadius.circular(12),
+                            border:
+                                Border.all(color: AppTheme.border),
+                          ),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                backgroundColor:
+                                    AppTheme.warning.withOpacity(0.1),
+                                child: Text(
+                                  debt.clientName[0].toUpperCase(),
+                                  style: const TextStyle(
+                                    color: AppTheme.warning,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      debt.clientName,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w600),
+                                    ),
+                                    Text(
+                                      'Depuis le ${debt.createdAt.day.toString().padLeft(2, '0')}/${debt.createdAt.month.toString().padLeft(2, '0')}/${debt.createdAt.year}',
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppTheme.textSecondary),
+                                    ),
+                                    if (debt.payments.isNotEmpty)
+                                      Text(
+                                        '${debt.payments.length} paiement(s) reçu(s)',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppTheme.secondary,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '${debt.remainingAmount.toStringAsFixed(0)} F',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15,
+                                      color: AppTheme.warning,
+                                    ),
+                                  ),
+                                  Text(
+                                    'sur ${debt.originalAmount.toStringAsFixed(0)} F',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppTheme.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -80,71 +80,218 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     });
   }
 
-  void _showEditItemDialog(int index) {
+  void _showEditItemDialog(int index) async {
     final item = _cart[index];
+    final settings = await DatabaseHelper.getSettings();
     final priceCtrl = TextEditingController(
         text: item.customPrice.toStringAsFixed(0));
-    final discountCtrl = TextEditingController(
-        text: item.discount.toStringAsFixed(0));
     final qtyCtrl = TextEditingController(
         text: item.quantity.toString());
 
+    final purchasePrice = item.product.purchasePrice;
+    final sellingPrice = item.product.sellingPrice;
+    final maxDiscountAmount = sellingPrice * (settings.maxDiscountPercent / 100);
+    final priceAfterMaxDiscount = sellingPrice - maxDiscountAmount;
+
+    // Prix minimum = le plus élevé entre :
+    // - prix après réduction max autorisée
+    // - prix d'achat (si enforceMinPrice activé)
+    final minAllowedPrice = settings.enforceMinPrice
+        ? priceAfterMaxDiscount.clamp(purchasePrice, double.infinity)
+        : priceAfterMaxDiscount.clamp(0, double.infinity);
+
+
+    if (!mounted) return;
+
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text(item.product.name),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: qtyCtrl,
-              decoration: const InputDecoration(labelText: 'Quantité'),
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      builder: (_) => StatefulBuilder(
+        builder: (context, setDialog) {
+          final currentPrice =
+              double.tryParse(priceCtrl.text) ?? item.customPrice;
+          final discount = item.product.sellingPrice - currentPrice;
+          final discountPercent = item.product.sellingPrice > 0
+              ? (discount / item.product.sellingPrice) * 100
+              : 0.0;
+          final isBelowMin = currentPrice < minAllowedPrice;
+
+          return AlertDialog(
+            title: Text(item.product.name),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Info prix
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment:
+                            MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Prix de base',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.textSecondary)),
+                          Text(
+                              '${item.product.sellingPrice.toStringAsFixed(0)} F',
+                              style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment:
+                            MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("Prix d'achat",
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.textSecondary)),
+                          Text(
+                              '${item.product.purchasePrice.toStringAsFixed(0)} F',
+                              style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment:
+                            MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                              'Prix min (${settings.maxDiscountPercent.toStringAsFixed(0)}% max)',
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.textSecondary)),
+                          Text(
+                              '${minAllowedPrice.toStringAsFixed(0)} F',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.warning,
+                                  fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Quantité
+                TextFormField(
+                  controller: qtyCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Quantité',
+                    prefixIcon: Icon(Icons.numbers),
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Prix négocié
+                TextFormField(
+                  controller: priceCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Prix de vente négocié',
+                    suffixText: 'F',
+                    prefixIcon: const Icon(Icons.sell_outlined),
+                    errorText: isBelowMin
+                        ? 'Prix minimum : ${minAllowedPrice.toStringAsFixed(0)} F'
+                        : null,
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly
+                  ],
+                  onChanged: (_) => setDialog(() {}),
+                ),
+                const SizedBox(height: 8),
+
+                // Réduction calculée
+                if (discount > 0 && !isBelowMin)
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.secondary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisAlignment:
+                          MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Réduction appliquée',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.secondary)),
+                        Text(
+                          '-${discount.toStringAsFixed(0)} F (${discountPercent.toStringAsFixed(1)}%)',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                if (isBelowMin)
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.danger.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.block,
+                            size: 14, color: AppTheme.danger),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Prix trop bas — en dessous du seuil autorisé',
+                            style: const TextStyle(
+                                fontSize: 11, color: AppTheme.danger),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: priceCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Prix unitaire',
-                suffixText: 'F',
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Annuler'),
               ),
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: discountCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Remise par unité',
-                suffixText: 'F',
+              ElevatedButton(
+                onPressed: isBelowMin
+                    ? null
+                    : () {
+                        final newPrice =
+                            double.tryParse(priceCtrl.text) ??
+                                item.customPrice;
+                        final newQty =
+                            int.tryParse(qtyCtrl.text) ?? 1;
+                        setState(() {
+                          _cart[index].customPrice = newPrice;
+                          _cart[index].quantity = newQty;
+                          _cart[index].discount = 0;
+                        });
+                        Navigator.of(context, rootNavigator: true).pop();
+                      },
+                child: const Text('Appliquer'),
               ),
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _cart[index].quantity =
-                    int.tryParse(qtyCtrl.text) ?? 1;
-                _cart[index].customPrice =
-                    double.tryParse(priceCtrl.text) ??
-                        item.product.sellingPrice;
-                _cart[index].discount =
-                    double.tryParse(discountCtrl.text) ?? 0;
-              });
-              Navigator.pop(context);
-            },
-            child: const Text('Appliquer'),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -153,6 +300,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     if (_cart.isEmpty) return;
     final paidCtrl =
         TextEditingController(text: _total.toStringAsFixed(0));
+    double paidAmount = _total;
     PaymentMethod selectedMethod = PaymentMethod.cash;
 
     showDialog(
@@ -234,78 +382,180 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 const SizedBox(height: 16),
 
                 // Montant payé
-                TextFormField(
-                  controller: paidCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Montant reçu',
-                    suffixText: 'F',
+                if (selectedMethod != PaymentMethod.debt)
+                  TextFormField(
+                    controller: paidCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Montant reçu',
+                      suffixText: 'F',
+                    ),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly
+                    ],
+                    onChanged: (v) {
+                      paidAmount = double.tryParse(v) ?? _total;
+                      setDialogState(() {});
+                    },
                   ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: (_) => setDialogState(() {}),
-                ),
                 const SizedBox(height: 8),
 
-                // Monnaie à rendre
-                AnimatedBuilder(
-                  animation: paidCtrl,
-                  builder: (_, __) {
-                    final paid = double.tryParse(paidCtrl.text) ?? 0;
-                    final change = paid - _total;
-                    if (change <= 0) return const SizedBox.shrink();
-                    return Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppTheme.secondary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Monnaie à rendre'),
-                          Text(
-                            '${change.toStringAsFixed(0)} F',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.secondary,
-                              fontSize: 16,
+                // Monnaie à rendre — seulement si espèces/carte/mobile
+                if (selectedMethod != PaymentMethod.debt)
+                  AnimatedBuilder(
+                    animation: paidCtrl,
+                    builder: (_, __) {
+                      final paid =
+                          double.tryParse(paidCtrl.text) ?? 0;
+                      final change = paid - _total;
+                      if (change <= 0) return const SizedBox.shrink();
+                      return Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.secondary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment:
+                              MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Monnaie à rendre'),
+                            Text(
+                              '${change.toStringAsFixed(0)} F',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.secondary,
+                                fontSize: 16,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
 
+                // Client requis pour dette
                 // Client requis pour dette
                 if (selectedMethod == PaymentMethod.debt) ...[
                   const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppTheme.warning.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                          color: AppTheme.warning.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline,
-                            color: AppTheme.warning, size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _selectedClient != null
-                                ? 'Client : ${_selectedClient!.name}'
-                                : 'Sélectionne un client avant de valider',
+                  FutureBuilder<List<dynamic>>(
+                    future: DatabaseHelper.getClients(),
+                    builder: (context, snapshot) {
+                      final clients = snapshot.data ?? [];
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Choisir le client',
                             style: TextStyle(
-                              color: AppTheme.warning,
                               fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textSecondary,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
+                          const SizedBox(height: 8),
+                          if (clients.isEmpty)
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppTheme.danger.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'Aucun client — ajoute-en dans l\'onglet Clients',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.danger,
+                                ),
+                              ),
+                            )
+                          else
+                            ...clients.map((client) => GestureDetector(
+                                  onTap: () {
+                                    setState(
+                                        () => _selectedClient = client);
+                                    setDialogState(() {});
+                                  },
+                                  child: Container(
+                                    margin:
+                                        const EdgeInsets.only(bottom: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: _selectedClient?.id ==
+                                              client.id
+                                          ? AppTheme.primary
+                                              .withOpacity(0.1)
+                                          : AppTheme.surface,
+                                      borderRadius:
+                                          BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: _selectedClient?.id ==
+                                                client.id
+                                            ? AppTheme.primary
+                                            : AppTheme.border,
+                                        width:
+                                            _selectedClient?.id == client.id
+                                                ? 2
+                                                : 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 16,
+                                          backgroundColor:
+                                              AppTheme.primary.withOpacity(0.1),
+                                          child: Text(
+                                            client.name[0].toUpperCase(),
+                                            style: const TextStyle(
+                                              color: AppTheme.primary,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                client.name,
+                                                style: TextStyle(
+                                                  fontWeight:
+                                                      FontWeight.w600,
+                                                  fontSize: 13,
+                                                  color: _selectedClient
+                                                              ?.id ==
+                                                          client.id
+                                                      ? AppTheme.primary
+                                                      : AppTheme.textPrimary,
+                                                ),
+                                              ),
+                                              if (client.totalDebt > 0)
+                                                Text(
+                                                  'Dette: ${client.totalDebt.toStringAsFixed(0)} F',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color: AppTheme.warning,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        if (_selectedClient?.id == client.id)
+                                          const Icon(Icons.check_circle,
+                                              color: AppTheme.primary,
+                                              size: 18),
+                                      ],
+                                    ),
+                                  ),
+                                )),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ],
@@ -321,7 +571,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   ? null
                   : () => _processSale(
                         ctx,
-                        paidCtrl.text,
+                        paidAmount.toString(),
                         selectedMethod,
                       ),
               child: const Text('Valider la vente'),
@@ -350,8 +600,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     setState(() => _isProcessing = true);
 
     try {
-      final paid = double.tryParse(paidText) ?? _total;
-      final actualPaid = method == PaymentMethod.debt ? 0.0 : paid;
+      final paid = method == PaymentMethod.debt
+          ? 0.0
+          : _total;
 
       final sale = Sale(
         id: _uuid.v4(),
@@ -366,7 +617,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 ))
             .toList(),
         totalAmount: _total,
-        paidAmount: actualPaid,
+        paidAmount: paid,
         paymentMethod: method,
         status: method == PaymentMethod.debt
             ? SaleStatus.partial
@@ -378,14 +629,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
       await DatabaseHelper.insertSale(sale);
 
-      // Mettre à jour le stock
       for (final item in _cart) {
         final newStock = item.product.stock - item.quantity;
         await DatabaseHelper.updateProductStock(
             item.product.id, newStock.clamp(0, 999999));
       }
 
-      // Créer la dette si nécessaire
       if (method == PaymentMethod.debt && _selectedClient != null) {
         final debt = Debt(
           id: _uuid.v4(),
@@ -403,15 +652,14 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         );
       }
 
-      // Rafraîchir les produits
       await ref.read(productsProvider.notifier).reload();
 
-      if (mounted) Navigator.pop(dialogContext);
+      if (mounted) Navigator.of(dialogContext, rootNavigator: true).pop();
 
-      // Confirmation
       if (mounted) {
-        final change =
-            method != PaymentMethod.debt ? (paid - _total) : 0.0;
+        final profit = _totalProfit;
+        final total = _total;
+
         showDialog(
           context: context,
           builder: (_) => AlertDialog(
@@ -426,28 +674,31 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 _ReceiptRow(
-                    label: 'Total', value: '${_total.toStringAsFixed(0)} F'),
+                  label: 'Total',
+                  value: '${total.toStringAsFixed(0)} F',
+                ),
                 if (method != PaymentMethod.debt)
                   _ReceiptRow(
-                      label: 'Reçu',
-                      value: '${paid.toStringAsFixed(0)} F'),
-                if (change > 0)
+                    label: 'Reçu',
+                    value: '${(double.tryParse(paidText) ?? total).toStringAsFixed(0)} F',
+                  ),
+                if (method != PaymentMethod.debt && (double.tryParse(paidText) ?? total) > total)
                   _ReceiptRow(
-                    label: 'Monnaie',
-                    value: '${change.toStringAsFixed(0)} F',
+                    label: 'Monnaie à rendre',
+                    value: '${((double.tryParse(paidText) ?? total) - total).toStringAsFixed(0)} F',
                     highlight: true,
                   ),
                 if (method == PaymentMethod.debt)
                   _ReceiptRow(
                     label: 'Dette créée',
-                    value: '${_total.toStringAsFixed(0)} F',
+                    value: '${total.toStringAsFixed(0)} F',
                     highlight: true,
                     color: AppTheme.warning,
                   ),
                 const Divider(),
                 _ReceiptRow(
                   label: 'Bénéfice',
-                  value: '${_totalProfit.toStringAsFixed(0)} F',
+                  value: '${profit.toStringAsFixed(0)} F',
                   color: AppTheme.secondary,
                 ),
               ],
@@ -484,40 +735,82 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
     showModalBottomSheet(
       context: context,
-      builder: (_) => Column(
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Sélectionner un client',
-                style:
-                    TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: clients.isEmpty
-                ? const Center(child: Text('Aucun client enregistré'))
-                : ListView.builder(
-                    itemCount: clients.length,
-                    itemBuilder: (_, i) => ListTile(
-                      leading: const CircleAvatar(
-                          child: Icon(Icons.person)),
-                      title: Text(clients[i].name),
-                      subtitle: clients[i].totalDebt > 0
-                          ? Text(
-                              'Dette : ${clients[i].totalDebt.toStringAsFixed(0)} F',
-                              style: const TextStyle(
-                                  color: AppTheme.warning),
-                            )
-                          : null,
-                      onTap: () {
-                        setState(
-                            () => _selectedClient = clients[i]);
-                        Navigator.pop(context);
-                      },
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppTheme.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Text(
+                'Sélectionner un client',
+                style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const Divider(height: 1),
+            if (clients.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Text(
+                  'Aucun client — ajoute-en depuis l\'onglet Clients',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppTheme.textSecondary),
+                ),
+              )
+            else
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 400),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: clients.length,
+                  itemBuilder: (_, i) => ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor:
+                          AppTheme.primary.withOpacity(0.1),
+                      child: Text(
+                        clients[i].name[0].toUpperCase(),
+                        style: const TextStyle(
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
+                    title: Text(clients[i].name),
+                    subtitle: clients[i].phone != null
+                        ? Text(clients[i].phone!)
+                        : null,
+                    trailing: clients[i].totalDebt > 0
+                        ? Text(
+                            'Dette: ${clients[i].totalDebt.toStringAsFixed(0)} F',
+                            style: const TextStyle(
+                              color: AppTheme.warning,
+                              fontSize: 12,
+                            ),
+                          )
+                        : null,
+                    onTap: () {
+                      setState(() => _selectedClient = clients[i]);
+                      Navigator.of(ctx).pop();
+                    },
                   ),
-          ),
-        ],
+                ),
+              ),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
     );
   }

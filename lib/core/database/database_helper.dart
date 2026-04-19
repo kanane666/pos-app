@@ -4,6 +4,8 @@ import '../models/product.dart';
 import '../models/client.dart';
 import '../models/sale.dart';
 import '../models/debt.dart';
+import '../models/work_session.dart';
+import '../models/settings.dart';
 
 class DatabaseHelper {
   static const _productsKey = 'products';
@@ -198,5 +200,77 @@ class DatabaseHelper {
       'collected': collected,
       'count': completed.length.toDouble(),
     };
+  }
+  // ─── WORK SESSION ────────────────────────────────────────
+
+  static const _sessionKey = 'work_session';
+  static const _settingsKey = 'app_settings';
+
+  static Future<WorkSession?> getCurrentSession() async {
+    final prefs = await _prefs;
+    final data = prefs.getString(_sessionKey);
+    if (data == null) return null;
+    final session = WorkSession.fromMap(jsonDecode(data));
+    if (!session.isOpen) return null;
+    return session;
+  }
+
+  static Future<List<WorkSession>> getAllSessions() async {
+    final prefs = await _prefs;
+    final data = prefs.getString('all_sessions');
+    if (data == null) return [];
+    final List decoded = jsonDecode(data);
+    return decoded
+        .map((e) => WorkSession.fromMap(e as Map<String, dynamic>))
+        .toList()
+      ..sort((a, b) => b.openedAt.compareTo(a.openedAt));
+  }
+
+  static Future<void> openSession(WorkSession session) async {
+    final prefs = await _prefs;
+    await prefs.setString(_sessionKey, jsonEncode(session.toMap()));
+    final all = await getAllSessions();
+    all.insert(0, session);
+    await prefs.setString(
+        'all_sessions', jsonEncode(all.map((e) => e.toMap()).toList()));
+  }
+
+  static Future<void> closeSession(WorkSession session) async {
+    final prefs = await _prefs;
+    final closed = session.copyWith(
+      closingCash: session.closingCash,
+      closedAt: DateTime.now(),
+      isOpen: false,
+    );
+    await prefs.setString(_sessionKey, jsonEncode(closed.toMap()));
+    final all = await getAllSessions();
+    final index = all.indexWhere((s) => s.id == session.id);
+    if (index != -1) all[index] = closed;
+    await prefs.setString(
+        'all_sessions', jsonEncode(all.map((e) => e.toMap()).toList()));
+  }
+
+  static Future<List<Sale>> getSalesBySession(WorkSession session) async {
+    final all = await getSales(limit: 100000);
+    final end = session.closedAt ?? DateTime.now();
+    return all
+        .where((s) =>
+            s.createdAt.isAfter(session.openedAt) &&
+            s.createdAt.isBefore(end))
+        .toList();
+  }
+
+  // ─── SETTINGS ───────────────────────────────────────────
+
+  static Future<AppSettings> getSettings() async {
+    final prefs = await _prefs;
+    final data = prefs.getString(_settingsKey);
+    if (data == null) return AppSettings();
+    return AppSettings.fromMap(jsonDecode(data));
+  }
+
+  static Future<void> saveSettings(AppSettings settings) async {
+    final prefs = await _prefs;
+    await prefs.setString(_settingsKey, jsonEncode(settings.toMap()));
   }
 }

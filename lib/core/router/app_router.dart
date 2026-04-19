@@ -6,6 +6,7 @@ import '../../features/products/screens/product_form_screen.dart';
 import '../../features/clients/screens/clients_screen.dart';
 import '../../features/stock/screens/stock_screen.dart';
 import '../../features/reports/screens/reports_screen.dart';
+import '../../features/settings/screens/settings_screen.dart';
 import '../models/product.dart';
 
 final GoRouter appRouter = GoRouter(
@@ -47,6 +48,10 @@ final GoRouter appRouter = GoRouter(
           path: '/reports',
           builder: (context, state) => const ReportsScreen(),
         ),
+        GoRoute(
+          path: '/settings',
+          builder: (context, state) => const SettingsScreen(),
+        ),
       ],
     ),
   ],
@@ -63,6 +68,7 @@ class MainShell extends StatelessWidget {
     if (location.startsWith('/clients')) return 2;
     if (location.startsWith('/stock')) return 3;
     if (location.startsWith('/reports')) return 4;
+    if (location.startsWith('/settings')) return 5;
     return 0;
   }
 
@@ -89,6 +95,9 @@ class MainShell extends StatelessWidget {
             case 4:
               context.go('/reports');
               break;
+            case 5:
+              context.go('/settings');
+              break;
           }
         },
         items: const [
@@ -111,6 +120,10 @@ class MainShell extends StatelessWidget {
           BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart),
             label: 'Rapports',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings_outlined),
+            label: 'Réglages',
           ),
         ],
       ),
