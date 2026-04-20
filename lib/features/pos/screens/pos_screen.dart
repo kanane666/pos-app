@@ -90,16 +90,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
     final purchasePrice = item.product.purchasePrice;
     final sellingPrice = item.product.sellingPrice;
-    final maxDiscountAmount = sellingPrice * (settings.maxDiscountPercent / 100);
+    final maxDiscountAmount =
+        sellingPrice * (settings.maxDiscountPercent / 100);
     final priceAfterMaxDiscount = sellingPrice - maxDiscountAmount;
-
-    // Prix minimum = le plus élevé entre :
-    // - prix après réduction max autorisée
-    // - prix d'achat (si enforceMinPrice activé)
     final minAllowedPrice = settings.enforceMinPrice
         ? priceAfterMaxDiscount.clamp(purchasePrice, double.infinity)
         : priceAfterMaxDiscount.clamp(0, double.infinity);
-
 
     if (!mounted) return;
 
@@ -109,9 +105,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         builder: (context, setDialog) {
           final currentPrice =
               double.tryParse(priceCtrl.text) ?? item.customPrice;
-          final discount = item.product.sellingPrice - currentPrice;
-          final discountPercent = item.product.sellingPrice > 0
-              ? (discount / item.product.sellingPrice) * 100
+          final discount = sellingPrice - currentPrice;
+          final discountPercent = sellingPrice > 0
+              ? (discount / sellingPrice) * 100
               : 0.0;
           final isBelowMin = currentPrice < minAllowedPrice;
 
@@ -121,7 +117,6 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Info prix
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
@@ -131,57 +126,24 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   ),
                   child: Column(
                     children: [
-                      Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Prix de base',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppTheme.textSecondary)),
-                          Text(
-                              '${item.product.sellingPrice.toStringAsFixed(0)} F',
-                              style: const TextStyle(fontSize: 12)),
-                        ],
+                      _InfoRow(
+                        label: 'Prix de base',
+                        value: '${sellingPrice.toStringAsFixed(0)} F',
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text("Prix d'achat",
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppTheme.textSecondary)),
-                          Text(
-                              '${item.product.purchasePrice.toStringAsFixed(0)} F',
-                              style: const TextStyle(fontSize: 12)),
-                        ],
+                      _InfoRow(
+                        label: "Prix d'achat",
+                        value: '${purchasePrice.toStringAsFixed(0)} F',
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                              'Prix min (${settings.maxDiscountPercent.toStringAsFixed(0)}% max)',
-                              style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppTheme.textSecondary)),
-                          Text(
-                              '${minAllowedPrice.toStringAsFixed(0)} F',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppTheme.warning,
-                                  fontWeight: FontWeight.w600)),
-                        ],
+                      _InfoRow(
+                        label:
+                            'Prix min (${settings.maxDiscountPercent.toStringAsFixed(0)}% max)',
+                        value: '${minAllowedPrice.toStringAsFixed(0)} F',
+                        valueColor: AppTheme.warning,
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 12),
-
-                // Quantité
                 TextFormField(
                   controller: qtyCtrl,
                   decoration: const InputDecoration(
@@ -189,13 +151,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                     prefixIcon: Icon(Icons.numbers),
                   ),
                   keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly
-                  ],
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 ),
                 const SizedBox(height: 12),
-
-                // Prix négocié
                 TextFormField(
                   controller: priceCtrl,
                   decoration: InputDecoration(
@@ -207,14 +165,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                         : null,
                   ),
                   keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly
-                  ],
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   onChanged: (_) => setDialog(() {}),
                 ),
                 const SizedBox(height: 8),
-
-                // Réduction calculée
                 if (discount > 0 && !isBelowMin)
                   Container(
                     padding: const EdgeInsets.all(8),
@@ -223,13 +177,11 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Réduction appliquée',
+                        const Text('Réduction',
                             style: TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.secondary)),
+                                fontSize: 12, color: AppTheme.secondary)),
                         Text(
                           '-${discount.toStringAsFixed(0)} F (${discountPercent.toStringAsFixed(1)}%)',
                           style: const TextStyle(
@@ -241,7 +193,6 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       ],
                     ),
                   ),
-
                 if (isBelowMin)
                   Container(
                     padding: const EdgeInsets.all(8),
@@ -249,16 +200,15 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       color: AppTheme.danger.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Row(
+                    child: const Row(
                       children: [
-                        const Icon(Icons.block,
-                            size: 14, color: AppTheme.danger),
-                        const SizedBox(width: 6),
+                        Icon(Icons.block, size: 14, color: AppTheme.danger),
+                        SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             'Prix trop bas — en dessous du seuil autorisé',
-                            style: const TextStyle(
-                                fontSize: 11, color: AppTheme.danger),
+                            style:
+                                TextStyle(fontSize: 11, color: AppTheme.danger),
                           ),
                         ),
                       ],
@@ -275,11 +225,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 onPressed: isBelowMin
                     ? null
                     : () {
-                        final newPrice =
-                            double.tryParse(priceCtrl.text) ??
-                                item.customPrice;
-                        final newQty =
-                            int.tryParse(qtyCtrl.text) ?? 1;
+                        final newPrice = double.tryParse(priceCtrl.text) ??
+                            item.customPrice;
+                        final newQty = int.tryParse(qtyCtrl.text) ?? 1;
                         setState(() {
                           _cart[index].customPrice = newPrice;
                           _cart[index].quantity = newQty;
@@ -298,118 +246,149 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   void _showPaymentDialog() {
     if (_cart.isEmpty) return;
-    final paidCtrl =
-        TextEditingController(text: _total.toStringAsFixed(0));
-    double paidAmount = _total;
+    String enteredAmount = _total.toStringAsFixed(0);
     PaymentMethod selectedMethod = PaymentMethod.cash;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Encaissement'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Total
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Total à payer',
-                          style: TextStyle(fontWeight: FontWeight.w600)),
-                      Text(
-                        '${_total.toStringAsFixed(0)} F',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.primary,
+        builder: (context, setDialogState) {
+          final entered = double.tryParse(enteredAmount) ?? 0;
+          final change = entered - _total;
+
+          void onKey(String key) {
+            setDialogState(() {
+              if (key == '⌫') {
+                if (enteredAmount.isNotEmpty) {
+                  enteredAmount =
+                      enteredAmount.substring(0, enteredAmount.length - 1);
+                }
+              } else if (key == 'C') {
+                enteredAmount = '';
+              } else {
+                if (enteredAmount.length < 10) enteredAmount += key;
+              }
+            });
+          }
+
+          return AlertDialog(
+            title: const Text('Encaissement'),
+            contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Total
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Total',
+                            style: TextStyle(fontWeight: FontWeight.w600)),
+                        Text(
+                          '${_total.toStringAsFixed(0)} F',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.primary,
+                          ),
                         ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Mode de paiement
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Mode de paiement',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textSecondary)),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      _PaymentChip(
+                        label: 'Espèces',
+                        icon: Icons.money,
+                        selected: selectedMethod == PaymentMethod.cash,
+                        onTap: () => setDialogState(
+                            () => selectedMethod = PaymentMethod.cash),
+                      ),
+                      _PaymentChip(
+                        label: 'Mobile money',
+                        icon: Icons.phone_android,
+                        selected:
+                            selectedMethod == PaymentMethod.mobileMoney,
+                        onTap: () => setDialogState(() =>
+                            selectedMethod = PaymentMethod.mobileMoney),
+                      ),
+                      _PaymentChip(
+                        label: 'Carte',
+                        icon: Icons.credit_card,
+                        selected: selectedMethod == PaymentMethod.card,
+                        onTap: () => setDialogState(
+                            () => selectedMethod = PaymentMethod.card),
+                      ),
+                      _PaymentChip(
+                        label: 'Dette',
+                        icon: Icons.person_outline,
+                        selected: selectedMethod == PaymentMethod.debt,
+                        onTap: () => setDialogState(
+                            () => selectedMethod = PaymentMethod.debt),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
-                // Mode de paiement
-                const Text('Mode de paiement',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textSecondary)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    _PaymentChip(
-                      label: 'Espèces',
-                      icon: Icons.money,
-                      selected: selectedMethod == PaymentMethod.cash,
-                      onTap: () => setDialogState(
-                          () => selectedMethod = PaymentMethod.cash),
+                  // Pavé numérique pour espèces
+                  if (selectedMethod != PaymentMethod.debt) ...[
+                    // Affichage montant reçu
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Montant reçu',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.textSecondary)),
+                          const SizedBox(height: 4),
+                          Text(
+                            enteredAmount.isEmpty
+                                ? '0 F'
+                                : '$enteredAmount F',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: enteredAmount.isEmpty
+                                  ? AppTheme.textSecondary
+                                  : AppTheme.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    _PaymentChip(
-                      label: 'Mobile money',
-                      icon: Icons.phone_android,
-                      selected:
-                          selectedMethod == PaymentMethod.mobileMoney,
-                      onTap: () => setDialogState(() =>
-                          selectedMethod = PaymentMethod.mobileMoney),
-                    ),
-                    _PaymentChip(
-                      label: 'Carte',
-                      icon: Icons.credit_card,
-                      selected: selectedMethod == PaymentMethod.card,
-                      onTap: () => setDialogState(
-                          () => selectedMethod = PaymentMethod.card),
-                    ),
-                    _PaymentChip(
-                      label: 'Dette',
-                      icon: Icons.person_outline,
-                      selected: selectedMethod == PaymentMethod.debt,
-                      onTap: () => setDialogState(
-                          () => selectedMethod = PaymentMethod.debt),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+                    const SizedBox(height: 8),
 
-                // Montant payé
-                if (selectedMethod != PaymentMethod.debt)
-                  TextFormField(
-                    controller: paidCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Montant reçu',
-                      suffixText: 'F',
-                    ),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly
-                    ],
-                    onChanged: (v) {
-                      paidAmount = double.tryParse(v) ?? _total;
-                      setDialogState(() {});
-                    },
-                  ),
-                const SizedBox(height: 8),
-
-                // Monnaie à rendre — seulement si espèces/carte/mobile
-                if (selectedMethod != PaymentMethod.debt)
-                  AnimatedBuilder(
-                    animation: paidCtrl,
-                    builder: (_, __) {
-                      final paid =
-                          double.tryParse(paidCtrl.text) ?? 0;
-                      final change = paid - _total;
-                      if (change <= 0) return const SizedBox.shrink();
-                      return Container(
+                    // Monnaie à rendre
+                    if (enteredAmount.isNotEmpty && change > 0)
+                      Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: AppTheme.secondary.withOpacity(0.1),
@@ -419,7 +398,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                           mainAxisAlignment:
                               MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Monnaie à rendre'),
+                            const Text('Monnaie à rendre',
+                                style: TextStyle(fontSize: 13)),
                             Text(
                               '${change.toStringAsFixed(0)} F',
                               style: const TextStyle(
@@ -430,154 +410,152 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             ),
                           ],
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    const SizedBox(height: 8),
 
-                // Client requis pour dette
-                // Client requis pour dette
-                if (selectedMethod == PaymentMethod.debt) ...[
-                  const SizedBox(height: 12),
-                  FutureBuilder<List<dynamic>>(
-                    future: DatabaseHelper.getClients(),
-                    builder: (context, snapshot) {
-                      final clients = snapshot.data ?? [];
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Choisir le client',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          if (clients.isEmpty)
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AppTheme.danger.withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text(
-                                'Aucun client — ajoute-en dans l\'onglet Clients',
+                    // Pavé numérique
+                    _NumPad(onKey: onKey),
+                  ],
+
+                  // Sélection client pour dette
+                  if (selectedMethod == PaymentMethod.debt) ...[
+                    FutureBuilder<List<dynamic>>(
+                      future: DatabaseHelper.getClients(),
+                      builder: (context, snapshot) {
+                        final clients = snapshot.data ?? [];
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Choisir le client',
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppTheme.danger,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textSecondary)),
+                            const SizedBox(height: 8),
+                            if (clients.isEmpty)
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.danger.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
-                              ),
-                            )
-                          else
-                            ...clients.map((client) => GestureDetector(
-                                  onTap: () {
-                                    setState(
-                                        () => _selectedClient = client);
-                                    setDialogState(() {});
-                                  },
-                                  child: Container(
-                                    margin:
-                                        const EdgeInsets.only(bottom: 6),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 10),
-                                    decoration: BoxDecoration(
-                                      color: _selectedClient?.id ==
-                                              client.id
-                                          ? AppTheme.primary
-                                              .withOpacity(0.1)
-                                          : AppTheme.surface,
-                                      borderRadius:
-                                          BorderRadius.circular(8),
-                                      border: Border.all(
+                                child: const Text(
+                                  'Aucun client — ajoute-en dans l\'onglet Clients',
+                                  style: TextStyle(
+                                      fontSize: 12, color: AppTheme.danger),
+                                ),
+                              )
+                            else
+                              ...clients.map((client) => GestureDetector(
+                                    onTap: () {
+                                      setState(
+                                          () => _selectedClient = client);
+                                      setDialogState(() {});
+                                    },
+                                    child: Container(
+                                      margin:
+                                          const EdgeInsets.only(bottom: 6),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 10),
+                                      decoration: BoxDecoration(
                                         color: _selectedClient?.id ==
                                                 client.id
                                             ? AppTheme.primary
-                                            : AppTheme.border,
-                                        width:
-                                            _selectedClient?.id == client.id
-                                                ? 2
-                                                : 1,
+                                                .withOpacity(0.1)
+                                            : AppTheme.surface,
+                                        borderRadius:
+                                            BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: _selectedClient?.id ==
+                                                  client.id
+                                              ? AppTheme.primary
+                                              : AppTheme.border,
+                                          width: _selectedClient?.id ==
+                                                  client.id
+                                              ? 2
+                                              : 1,
+                                        ),
                                       ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        CircleAvatar(
-                                          radius: 16,
-                                          backgroundColor:
-                                              AppTheme.primary.withOpacity(0.1),
-                                          child: Text(
-                                            client.name[0].toUpperCase(),
-                                            style: const TextStyle(
-                                              color: AppTheme.primary,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 12,
+                                      child: Row(
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 16,
+                                            backgroundColor: AppTheme.primary
+                                                .withOpacity(0.1),
+                                            child: Text(
+                                              client.name[0].toUpperCase(),
+                                              style: const TextStyle(
+                                                color: AppTheme.primary,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 12,
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                client.name,
-                                                style: TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.w600,
-                                                  fontSize: 13,
-                                                  color: _selectedClient
-                                                              ?.id ==
-                                                          client.id
-                                                      ? AppTheme.primary
-                                                      : AppTheme.textPrimary,
-                                                ),
-                                              ),
-                                              if (client.totalDebt > 0)
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
                                                 Text(
-                                                  'Dette: ${client.totalDebt.toStringAsFixed(0)} F',
-                                                  style: const TextStyle(
-                                                    fontSize: 11,
-                                                    color: AppTheme.warning,
+                                                  client.name,
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 13,
+                                                    color: _selectedClient
+                                                                ?.id ==
+                                                            client.id
+                                                        ? AppTheme.primary
+                                                        : AppTheme.textPrimary,
                                                   ),
                                                 ),
-                                            ],
+                                                if (client.totalDebt > 0)
+                                                  Text(
+                                                    'Dette: ${client.totalDebt.toStringAsFixed(0)} F',
+                                                    style: const TextStyle(
+                                                        fontSize: 11,
+                                                        color:
+                                                            AppTheme.warning),
+                                                  ),
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                        if (_selectedClient?.id == client.id)
-                                          const Icon(Icons.check_circle,
-                                              color: AppTheme.primary,
-                                              size: 18),
-                                      ],
+                                          if (_selectedClient?.id == client.id)
+                                            const Icon(Icons.check_circle,
+                                                color: AppTheme.primary,
+                                                size: 18),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                )),
-                        ],
-                      );
-                    },
-                  ),
+                                  )),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Annuler'),
-            ),
-            ElevatedButton(
-              onPressed: _isProcessing
-                  ? null
-                  : () => _processSale(
-                        ctx,
-                        paidAmount.toString(),
-                        selectedMethod,
-                      ),
-              child: const Text('Valider la vente'),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Annuler'),
+              ),
+              ElevatedButton(
+                onPressed: _isProcessing
+                    ? null
+                    : () => _processSale(
+                          ctx,
+                          enteredAmount.isEmpty
+                              ? _total.toString()
+                              : enteredAmount,
+                          selectedMethod,
+                        ),
+                child: const Text('Valider la vente'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -659,6 +637,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       if (mounted) {
         final profit = _totalProfit;
         final total = _total;
+        final receivedAmount = double.tryParse(paidText) ?? total;
+        final change = method != PaymentMethod.debt
+            ? (receivedAmount - total)
+            : 0.0;
 
         showDialog(
           context: context,
@@ -680,12 +662,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 if (method != PaymentMethod.debt)
                   _ReceiptRow(
                     label: 'Reçu',
-                    value: '${(double.tryParse(paidText) ?? total).toStringAsFixed(0)} F',
+                    value: '${receivedAmount.toStringAsFixed(0)} F',
                   ),
-                if (method != PaymentMethod.debt && (double.tryParse(paidText) ?? total) > total)
+                if (method != PaymentMethod.debt && change > 0)
                   _ReceiptRow(
                     label: 'Monnaie à rendre',
-                    value: '${((double.tryParse(paidText) ?? total) - total).toStringAsFixed(0)} F',
+                    value: '${change.toStringAsFixed(0)} F',
                     highlight: true,
                   ),
                 if (method == PaymentMethod.debt)
@@ -755,9 +737,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: Text(
-                'Sélectionner un client',
-                style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w600),
+                'Associer un client',
+                style:
+                    TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
             const Divider(height: 1),
@@ -778,8 +760,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   itemCount: clients.length,
                   itemBuilder: (_, i) => ListTile(
                     leading: CircleAvatar(
-                      backgroundColor:
-                          AppTheme.primary.withOpacity(0.1),
+                      backgroundColor: AppTheme.primary.withOpacity(0.1),
                       child: Text(
                         clients[i].name[0].toUpperCase(),
                         style: const TextStyle(
@@ -796,9 +777,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                         ? Text(
                             'Dette: ${clients[i].totalDebt.toStringAsFixed(0)} F',
                             style: const TextStyle(
-                              color: AppTheme.warning,
-                              fontSize: 12,
-                            ),
+                                color: AppTheme.warning, fontSize: 12),
                           )
                         : null,
                     onTap: () {
@@ -829,8 +808,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               child: Chip(
                 avatar: const Icon(Icons.person, size: 16),
                 label: Text(_selectedClient!.name),
-                onDeleted: () =>
-                    setState(() => _selectedClient = null),
+                onDeleted: () => setState(() => _selectedClient = null),
               ),
             ),
           IconButton(
@@ -847,8 +825,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         ],
       ),
       body: productsAsync.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Erreur : $e')),
         data: (products) {
           final filtered = products
@@ -861,7 +838,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
           return Column(
             children: [
-              // Barre de recherche
+              // Recherche
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: TextField(
@@ -879,8 +856,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                           )
                         : null,
                   ),
-                  onChanged: (v) =>
-                      setState(() => _searchQuery = v),
+                  onChanged: (v) => setState(() => _searchQuery = v),
                 ),
               ),
 
@@ -888,11 +864,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               Expanded(
                 flex: 5,
                 child: filtered.isEmpty
-                    ? const Center(
-                        child: Text('Aucun produit trouvé'))
+                    ? const Center(child: Text('Aucun produit trouvé'))
                     : GridView.builder(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 12),
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 3,
@@ -901,8 +876,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                           mainAxisSpacing: 8,
                         ),
                         itemCount: filtered.length,
-                        itemBuilder: (_, i) =>
-                            _ProductTile(
+                        itemBuilder: (_, i) => _ProductTile(
                           product: filtered[i],
                           onTap: () => _addToCart(filtered[i]),
                         ),
@@ -913,11 +887,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               if (_cart.isNotEmpty) ...[
                 const Divider(height: 1),
                 Container(
-                  constraints:
-                      const BoxConstraints(maxHeight: 200),
+                  constraints: const BoxConstraints(maxHeight: 220),
                   child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 4),
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
                     itemCount: _cart.length,
                     itemBuilder: (_, i) => _CartRow(
                       item: _cart[i],
@@ -926,19 +898,18 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                     ),
                   ),
                 ),
-                // Total + bouton payer
+                // Total + encaisser
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                   decoration: const BoxDecoration(
                     color: AppTheme.cardBg,
-                    border: Border(
-                        top: BorderSide(color: AppTheme.border)),
+                    border:
+                        Border(top: BorderSide(color: AppTheme.border)),
                   ),
                   child: Row(
                     children: [
                       Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text('Total',
                               style: TextStyle(
@@ -979,12 +950,111 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 }
 
+// ─── Widgets ────────────────────────────────────────────────
+
+class _NumPad extends StatelessWidget {
+  final void Function(String) onKey;
+  const _NumPad({required this.onKey});
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = [
+      ['7', '8', '9'],
+      ['4', '5', '6'],
+      ['1', '2', '3'],
+      ['C', '0', '⌫'],
+    ];
+
+    return Column(
+      children: rows.map((row) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            children: row.map((key) {
+              final isSpecial = key == 'C' || key == '⌫';
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: GestureDetector(
+                    onTap: () => onKey(key),
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: isSpecial
+                            ? AppTheme.danger.withOpacity(0.08)
+                            : AppTheme.surface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isSpecial
+                              ? AppTheme.danger.withOpacity(0.3)
+                              : AppTheme.border,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          key,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: isSpecial
+                                ? AppTheme.danger
+                                : AppTheme.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  const _InfoRow({
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 12, color: AppTheme.textSecondary)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight:
+                  valueColor != null ? FontWeight.w600 : FontWeight.normal,
+              color: valueColor ?? AppTheme.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ProductTile extends StatelessWidget {
   final Product product;
   final VoidCallback onTap;
 
-  const _ProductTile(
-      {required this.product, required this.onTap});
+  const _ProductTile({required this.product, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -999,14 +1069,13 @@ class _ProductTile extends StatelessWidget {
             children: [
               Expanded(
                 child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(12)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(12)),
                   child: product.imageUrl != null
                       ? Image.network(
                           product.imageUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              _placeholder(),
+                          errorBuilder: (_, __, ___) => _placeholder(),
                         )
                       : _placeholder(),
                 ),
@@ -1019,24 +1088,20 @@ class _ProductTile extends StatelessWidget {
                     Text(
                       product.name,
                       style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
+                          fontSize: 12, fontWeight: FontWeight.w600),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
                           '${product.sellingPrice.toStringAsFixed(0)} F',
                           style: const TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
+                              fontSize: 11,
+                              color: AppTheme.primary,
+                              fontWeight: FontWeight.w600),
                         ),
                         Text(
                           'x${product.stock}',
@@ -1062,8 +1127,7 @@ class _ProductTile extends StatelessWidget {
   Widget _placeholder() {
     return Container(
       color: AppTheme.border,
-      child: const Icon(Icons.image_outlined,
-          color: AppTheme.textSecondary),
+      child: const Icon(Icons.image_outlined, color: AppTheme.textSecondary),
     );
   }
 }
@@ -1074,50 +1138,89 @@ class _CartRow extends StatelessWidget {
   final VoidCallback onRemove;
 
   const _CartRow(
-      {required this.item,
-      required this.onEdit,
-      required this.onRemove});
+      {required this.item, required this.onEdit, required this.onRemove});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+    final hasDiscount = item.customPrice < item.product.sellingPrice;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.border),
+      ),
       child: Row(
         children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: onEdit,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(item.product.name,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 13)),
-                  Text(
-                    '${item.quantity} x ${item.customPrice.toStringAsFixed(0)} F'
-                    '${item.discount > 0 ? ' (-${item.discount.toStringAsFixed(0)} F)' : ''}',
-                    style: const TextStyle(
-                        fontSize: 11,
-                        color: AppTheme.textSecondary),
-                  ),
-                ],
+          // Bouton modifier explicite
+          GestureDetector(
+            onTap: onEdit,
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(6),
               ),
+              child: const Icon(Icons.edit_outlined,
+                  size: 16, color: AppTheme.primary),
             ),
           ),
+          const SizedBox(width: 10),
+          // Infos produit
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.product.name,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 13),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Row(
+                  children: [
+                    Text(
+                      '${item.quantity} x ${item.customPrice.toStringAsFixed(0)} F',
+                      style: const TextStyle(
+                          fontSize: 11, color: AppTheme.textSecondary),
+                    ),
+                    if (hasDiscount) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppTheme.secondary.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '-${(item.product.sellingPrice - item.customPrice).toStringAsFixed(0)} F',
+                          style: const TextStyle(
+                              fontSize: 10, color: AppTheme.secondary),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Total ligne
           Text(
             '${item.total.toStringAsFixed(0)} F',
             style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
               color: AppTheme.primary,
             ),
           ),
           const SizedBox(width: 8),
+          // Supprimer
           GestureDetector(
             onTap: onRemove,
-            child: const Icon(Icons.close,
-                size: 18, color: AppTheme.danger),
+            child: const Icon(Icons.close, size: 18, color: AppTheme.danger),
           ),
         ],
       ),
@@ -1143,8 +1246,7 @@ class _PaymentChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
           color: selected
@@ -1152,8 +1254,7 @@ class _PaymentChip extends StatelessWidget {
               : AppTheme.surface,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color:
-                selected ? AppTheme.primary : AppTheme.border,
+            color: selected ? AppTheme.primary : AppTheme.border,
             width: selected ? 2 : 1,
           ),
         ),
@@ -1162,20 +1263,17 @@ class _PaymentChip extends StatelessWidget {
           children: [
             Icon(icon,
                 size: 16,
-                color: selected
-                    ? AppTheme.primary
-                    : AppTheme.textSecondary),
+                color:
+                    selected ? AppTheme.primary : AppTheme.textSecondary),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: selected
-                    ? FontWeight.w600
-                    : FontWeight.normal,
-                color: selected
-                    ? AppTheme.primary
-                    : AppTheme.textSecondary,
+                fontWeight:
+                    selected ? FontWeight.w600 : FontWeight.normal,
+                color:
+                    selected ? AppTheme.primary : AppTheme.textSecondary,
               ),
             ),
           ],
@@ -1206,19 +1304,14 @@ class _ReceiptRow extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label,
-              style:
-                  const TextStyle(color: AppTheme.textSecondary)),
+              style: const TextStyle(color: AppTheme.textSecondary)),
           Text(
             value,
             style: TextStyle(
-              fontWeight: highlight
-                  ? FontWeight.w700
-                  : FontWeight.w500,
+              fontWeight: highlight ? FontWeight.w700 : FontWeight.w500,
               fontSize: highlight ? 16 : 14,
               color: color ??
-                  (highlight
-                      ? AppTheme.primary
-                      : AppTheme.textPrimary),
+                  (highlight ? AppTheme.primary : AppTheme.textPrimary),
             ),
           ),
         ],
